@@ -32,6 +32,9 @@ const INITIAL_CARDS: Card[] = CARD_COPY.map(([title, subtitle, color], index) =>
   lat: [-0.58, 0.12, 0.6, -0.15, 0.42, -0.46][index],
 }));
 
+const MEDIAPIPE_WASM_PATH = "/mediapipe/wasm";
+const HAND_LANDMARKER_MODEL_PATH = "/mediapipe/hand_landmarker.task";
+
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 function startBirthdayMusic() {
@@ -94,6 +97,7 @@ export default function Home() {
   const [stage, setStage] = useState<Stage>("idle");
   const [countdown, setCountdown] = useState(5);
   const [cameraOn, setCameraOn] = useState(false);
+  const [handTrackingReady, setHandTrackingReady] = useState(false);
   const [cameraHint, setCameraHint] = useState("开启手势");
   const [gestureStatus, setGestureStatus] = useState(GESTURE_LABELS.none);
   const [muted, setMuted] = useState(false);
@@ -188,6 +192,7 @@ export default function Home() {
     handLandmarkerRef.current = null;
     cancelAnimationFrame(inferenceRef.current);
     setCameraOn(false);
+    setHandTrackingReady(false);
     setGestureStatus(GESTURE_LABELS.none);
     setCameraHint("开启手势");
   }, []);
@@ -195,36 +200,44 @@ export default function Home() {
   const initHandLandmarker = useCallback(async () => {
     if (handLandmarkerRef.current) return handLandmarkerRef.current;
     const { FilesetResolver, HandLandmarker: MediaPipeHandLandmarker } = await import("@mediapipe/tasks-vision");
-    const vision = await FilesetResolver.forVisionTasks(
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.17/wasm",
-    );
+    const vision = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_PATH);
+    const createLandmarker = (delegate: "GPU" | "CPU") => MediaPipeHandLandmarker.createFromOptions(vision, {
+      baseOptions: {
+        modelAssetPath: HAND_LANDMARKER_MODEL_PATH,
+        delegate,
+      },
+      runningMode: "VIDEO",
+      numHands: 1,
+    });
     try {
-      handLandmarkerRef.current = await MediaPipeHandLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-          delegate: "GPU",
-        },
-        runningMode: "VIDEO",
-        numHands: 1,
-      });
+      handLandmarkerRef.current = await createLandmarker("GPU");
     } catch {
-      handLandmarkerRef.current = await MediaPipeHandLandmarker.createFromOptions(vision, {
-        baseOptions: {
-          modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
-          delegate: "CPU",
-        },
-        runningMode: "VIDEO",
-        numHands: 1,
-      });
+      handLandmarkerRef.current = await createLandmarker("CPU");
     }
     return handLandmarkerRef.current;
   }, []);
 
   const toggleCamera = useCallback(async () => {
-    if (streamRef.current) {
+    if (streamRef.current && handTrackingReady) {
       stopCamera();
       return;
     }
+
+    if (streamRef.current && !handTrackingReady) {
+      try {
+        setCameraHint("AI 初始化");
+        await initHandLandmarker();
+        setHandTrackingReady(true);
+        setCameraHint("手势控制中");
+        setGestureStatus(GESTURE_LABELS.none);
+      } catch (error) {
+        console.warn("HandLandmarker initialization failed", error);
+        setCameraHint("AI初始化失败");
+        setGestureStatus("未检测到手");
+      }
+      return;
+    }
+
     try {
       setCameraHint("请允许相机");
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -236,18 +249,25 @@ export default function Home() {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
+      setCameraOn(true);
+      setGestureStatus(GESTURE_LABELS.none);
       setCameraHint("AI 初始化");
       await initHandLandmarker();
-      setCameraOn(true);
+      setHandTrackingReady(true);
       setCameraHint("手势控制中");
-      setGestureStatus(GESTURE_LABELS.none);
-    } catch {
-      stopCamera();
-      setCameraHint("摄像头不可用");
+    } catch (error) {
+      console.warn("Camera or HandLandmarker initialization failed", error);
+      if (!streamRef.current) {
+        stopCamera();
+        setCameraHint("摄像头不可用");
+        window.setTimeout(() => setCameraHint("开启手势"), 2400);
+        return;
+      }
+      setHandTrackingReady(false);
+      setCameraHint("AI初始化失败");
       setGestureStatus("未检测到手");
-      window.setTimeout(() => setCameraHint("开启手势"), 2400);
     }
-  }, [initHandLandmarker, stopCamera]);
+  }, [handTrackingReady, initHandLandmarker, stopCamera]);
 
   const onPhotoUpload = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []).slice(0, 6);
@@ -345,7 +365,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!cameraOn) return;
+    if (!cameraOn || !handTrackingReady) return;
     const video = videoRef.current;
     const landmarker = handLandmarkerRef.current;
     if (!video || !landmarker) return;
@@ -379,7 +399,7 @@ export default function Home() {
     };
     inferenceRef.current = requestAnimationFrame(predict);
     return () => cancelAnimationFrame(inferenceRef.current);
-  }, [cameraOn, handleGestureEvent]);
+  }, [cameraOn, handTrackingReady, handleGestureEvent]);
 
   useEffect(() => () => {
     clearSequence();
@@ -457,7 +477,7 @@ export default function Home() {
               {muted ? "♩" : "♫"}<span className="action-label">{muted ? "音乐已关" : "音乐播放中"}</span>
             </button>
           )}
-          <button className={`icon-button ${cameraOn ? "active" : ""}`} onClick={toggleCamera} aria-label="开启摄像头手势">
+          <button className={`icon-button ${handTrackingReady ? "active" : ""}`} onClick={toggleCamera} aria-label="开启摄像头手势">
             <span className="hand-icon">✋</span><span className="action-label">{cameraHint}</span>
           </button>
         </div>
