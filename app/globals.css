@@ -173,7 +173,7 @@ button { color: inherit; }
   align-items: center;
   pointer-events: none;
 }
-.countdown-copy span { transform: translateY(155px); color: rgba(218,234,255,.44); font-size: 11px; letter-spacing: .35em; }
+.countdown-copy span { transform: translateY(clamp(180px, 23vw, 260px)); color: rgba(218,234,255,.44); font-size: 12px; letter-spacing: .35em; }
 .countdown-copy strong { opacity: 0; font-size: 1px; }
 
 .wish-copy, .firework-copy {

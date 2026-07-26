@@ -1,6 +1,7 @@
 import * as THREE from "three";
 
 type ParticleMode = "stars" | "text" | "cake" | "sphere";
+type FireworkIntensity = "normal" | "grand" | "cake";
 
 type FireworkParticle = {
   x: number;
@@ -33,13 +34,13 @@ const hslToRgb = (hue: number, saturation = 0.95, lightness = 0.74) => {
 function makeTextTargets(text: string, width: number, height: number, count: number) {
   const surface = document.createElement("canvas");
   surface.width = Math.min(900, Math.max(360, Math.floor(width * 0.78)));
-  surface.height = 280;
+  const isNumber = text.length === 1;
+  surface.height = isNumber ? 390 : 280;
   const ctx = surface.getContext("2d");
   if (!ctx) return new Float32Array(count * 3);
 
   ctx.clearRect(0, 0, surface.width, surface.height);
-  const isNumber = text.length === 1;
-  ctx.font = `800 ${isNumber ? 220 : clamp(surface.width / 5, 92, 150)}px "PingFang SC","Microsoft YaHei",sans-serif`;
+  ctx.font = `800 ${isNumber ? 320 : clamp(surface.width / 5, 92, 150)}px "PingFang SC","Microsoft YaHei",sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = "#fff";
@@ -56,7 +57,7 @@ function makeTextTargets(text: string, width: number, height: number, count: num
 
   const result = new Float32Array(count * 3);
   for (let i = 0; i < count; i++) {
-    const p = candidates[(Math.random() * candidates.length) | 0] ?? { x: surface.width / 2, y: 140 };
+    const p = candidates[(Math.random() * candidates.length) | 0] ?? { x: surface.width / 2, y: surface.height / 2 };
     result[i * 3] = p.x - surface.width / 2;
     result[i * 3 + 1] = height * 0.5 - (height * 0.5 + p.y - surface.height / 2);
     result[i * 3 + 2] = 0;
@@ -175,7 +176,7 @@ export class ParticleScene {
     this.alphas = new Float32Array(count);
     this.sizes = new Float32Array(count);
 
-    const maxFireworks = 1000;
+    const maxFireworks = 3000;
     this.fireworkPositions = new Float32Array(maxFireworks * 3);
     this.fireworkColors = new Float32Array(maxFireworks * 3);
     this.fireworkAlphas = new Float32Array(maxFireworks);
@@ -247,30 +248,56 @@ export class ParticleScene {
     if (mode === "cake") this.recolorCake();
   }
 
-  launchFireworks() {
-    const bursts = [
+  launchFireworks(intensity: FireworkIntensity = "normal") {
+    const grandBursts = [
+      [-0.42, 0.24, 330],
+      [-0.24, 0.18, 205],
+      [0.0, 0.28, 270],
+      [0.25, 0.2, 165],
+      [0.44, 0.27, 315],
+      [-0.36, -0.02, 52],
+      [-0.13, 0.02, 190],
+      [0.13, 0.04, 242],
+      [0.36, -0.01, 28],
+      [-0.04, -0.14, 300],
+      [0.04, 0.12, 128],
+    ];
+    const cakeBursts = [
+      [-0.36, 0.1, 330],
+      [-0.18, 0.18, 48],
+      [0, 0.24, 210],
+      [0.18, 0.18, 280],
+      [0.36, 0.1, 150],
+      [-0.26, -0.04, 198],
+      [0.26, -0.04, 318],
+    ];
+    const normalBursts = [
       [-0.32, 0.12, 330],
       [0.32, 0.18, 175],
       [0, 0.08, 265],
       [-0.19, 0.26, 195],
       [0.19, 0.28, 315],
     ];
+    const bursts = intensity === "grand" ? grandBursts : intensity === "cake" ? cakeBursts : normalBursts;
+    const particlesPerBurst = intensity === "grand" ? 300 : intensity === "cake" ? 230 : 180;
+    const delayStep = intensity === "grand" ? 135 : intensity === "cake" ? 190 : 330;
+    const baseLife = intensity === "grand" ? 1.05 : intensity === "cake" ? 0.92 : 0.8;
     bursts.forEach(([px, py, hue], burstIndex) => {
       window.setTimeout(() => {
-        for (let i = 0; i < 180; i++) {
+        for (let i = 0; i < particlesPerBurst; i++) {
           const angle = Math.random() * Math.PI * 2;
-          const speed = 1.4 + Math.random() * 4.7;
+          const speed = 1.8 + Math.random() * (intensity === "grand" ? 6.6 : 5.2);
           this.fireworks.push({
             x: this.width * px,
             y: this.height * py,
             z: 80,
             vx: Math.cos(angle) * speed,
             vy: Math.sin(angle) * speed,
-            life: 0.8 + Math.random() * 0.5,
+            life: baseLife + Math.random() * 0.65,
             hue: hue + Math.random() * 35,
           });
         }
-      }, burstIndex * 330);
+      }, burstIndex * delayStep);
     });
   }
 

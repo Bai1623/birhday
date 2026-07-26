@@ -36,6 +36,8 @@ const MEDIAPIPE_WASM_PATH = "/mediapipe/wasm";
 const HAND_LANDMARKER_MODEL_PATH = "/mediapipe/hand_landmarker.task";
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+const isInteractiveTarget = (target: EventTarget | null) =>
+  target instanceof HTMLElement && Boolean(target.closest("button,input,textarea,label"));
 
 function startBirthdayMusic() {
   const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -125,8 +127,8 @@ export default function Home() {
     timersRef.current = [];
   }, []);
 
-  const launchFireworks = useCallback(() => {
-    particleSceneRef.current?.launchFireworks();
+  const launchFireworks = useCallback((intensity?: "normal" | "grand" | "cake") => {
+    particleSceneRef.current?.launchFireworks(intensity);
   }, []);
 
   const begin = useCallback(() => {
@@ -149,28 +151,21 @@ export default function Home() {
     timersRef.current.push(window.setTimeout(() => {
       transition("wish");
       morphTo("text", "生日快乐");
+      launchFireworks("normal");
     }, 4600));
     timersRef.current.push(window.setTimeout(() => {
       transition("fireworks");
       morphTo("stars");
-      launchFireworks();
+      launchFireworks("grand");
     }, 6600));
     timersRef.current.push(window.setTimeout(() => {
       transition("cake");
       morphTo("cake");
+      launchFireworks("cake");
     }, 9400));
+    timersRef.current.push(window.setTimeout(() => launchFireworks("cake"), 10300));
+    timersRef.current.push(window.setTimeout(() => launchFireworks("cake"), 11200));
   }, [clearSequence, launchFireworks, morphTo, muted, transition]);
-
-  const toggleGallery = useCallback(() => {
-    if (stageRef.current === "cake") {
-      transition("gallery");
-      morphTo("sphere");
-    } else if (stageRef.current === "gallery") {
-      setSelectedCard(null);
-      transition("cake");
-      morphTo("cake");
-    }
-  }, [morphTo, transition]);
 
   const toggleMute = useCallback(() => {
     setMuted((value) => {
@@ -217,12 +212,7 @@ export default function Home() {
     return handLandmarkerRef.current;
   }, []);
 
-  const toggleCamera = useCallback(async () => {
-    if (streamRef.current && handTrackingReady) {
-      stopCamera();
-      return;
-    }
-
+  const startCamera = useCallback(async () => {
     if (streamRef.current && !handTrackingReady) {
       try {
         setCameraHint("AI 初始化");
@@ -268,6 +258,27 @@ export default function Home() {
       setGestureStatus("未检测到手");
     }
   }, [handTrackingReady, initHandLandmarker, stopCamera]);
+
+  const toggleCamera = useCallback(async () => {
+    if (streamRef.current && handTrackingReady) {
+      stopCamera();
+      return;
+    }
+
+    await startCamera();
+  }, [handTrackingReady, startCamera, stopCamera]);
+
+  const toggleGallery = useCallback(() => {
+    if (stageRef.current === "cake") {
+      transition("gallery");
+      morphTo("sphere");
+      void startCamera();
+    } else if (stageRef.current === "gallery") {
+      setSelectedCard(null);
+      transition("cake");
+      morphTo("cake");
+    }
+  }, [morphTo, startCamera, transition]);
 
   const onPhotoUpload = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []).slice(0, 6);
@@ -411,12 +422,14 @@ export default function Home() {
   }, [clearSequence]);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (isInteractiveTarget(event.target)) return;
     if (stage !== "gallery") return;
     dragRef.current = { active: true, x: event.clientX, y: event.clientY };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (isInteractiveTarget(event.target)) return;
     if (!dragRef.current.active || stage !== "gallery") return;
     const dx = event.clientX - dragRef.current.x;
     const dy = event.clientY - dragRef.current.y;

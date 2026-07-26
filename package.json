@@ -10,7 +10,7 @@
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite",
     "build": "bash scripts/build-verified.sh",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "node --test tests/gesture-core.test.mjs tests/mediapipe-assets.test.mjs && npm run build && node --test tests/rendered-html.test.mjs",
+    "test": "node --test tests/gesture-core.test.mjs tests/mediapipe-assets.test.mjs tests/celebration-behavior.test.mjs && npm run build && node --test tests/rendered-html.test.mjs",
     "validate:artifact": "bash scripts/validate-artifact.sh",
     "lint": "bash scripts/sites-env.sh -- eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern public/mediapipe/wasm",
     "db:generate": "bash scripts/sites-env.sh -- drizzle-kit generate"
