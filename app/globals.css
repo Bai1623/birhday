@@ -1,0 +1,418 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #050610;
+  --mint: #8bffe9;
+  --violet: #9380ff;
+  --muted: rgba(224, 233, 255, .58);
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; min-height: 100%; background: var(--ink); }
+
+body {
+  color: #f6f7ff;
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  overflow: hidden;
+}
+
+button, input, textarea { font: inherit; }
+button { color: inherit; }
+
+.experience {
+  position: relative;
+  width: 100vw;
+  height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(51, 60, 153, .14), transparent 36%),
+    linear-gradient(180deg, #050715, #03040c 68%, #090516);
+  touch-action: none;
+  user-select: none;
+}
+
+.experience::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: .24;
+  background-image:
+    linear-gradient(rgba(123, 149, 255, .05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(123, 149, 255, .05) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(circle, #000 0%, transparent 70%);
+}
+
+.particle-canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(circle, transparent 35%, rgba(1, 2, 10, .25) 64%, rgba(1, 1, 6, .8) 100%);
+}
+
+.aurora {
+  position: absolute;
+  z-index: 0;
+  width: 48vw;
+  height: 48vw;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: .11;
+  pointer-events: none;
+  animation: drift 14s ease-in-out infinite alternate;
+}
+.aurora-a { left: -20vw; top: 24%; background: #3df8d3; }
+.aurora-b { right: -20vw; top: 5%; background: #794eff; animation-delay: -5s; }
+@keyframes drift { to { transform: translate3d(10vw,-6vh,0) scale(1.16); } }
+
+.topbar {
+  position: absolute;
+  z-index: 20;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 26px 30px;
+}
+
+.top-actions { display: flex; gap: 10px; }
+
+.icon-button {
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 1px solid rgba(151, 250, 236, .2);
+  border-radius: 999px;
+  background: rgba(8, 13, 31, .44);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+  color: rgba(233, 255, 251, .75);
+  font-size: 12px;
+  letter-spacing: .08em;
+  transition: .25s ease;
+}
+
+.icon-button:hover, .icon-button.active { border-color: rgba(139, 255, 233, .7); color: var(--mint); box-shadow: 0 0 24px rgba(74, 255, 218, .12); }
+.brand-mark { background: transparent; border-color: transparent; padding-left: 0; }
+.brand-mark:hover { box-shadow: none; }
+.spark-symbol { font-size: 20px; color: var(--mint); filter: drop-shadow(0 0 10px rgba(139,255,233,.8)); }
+.brand-copy { font-size: 11px; letter-spacing: .25em; }
+.hand-icon { font-size: 16px; }
+
+.start-screen {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 50%;
+  width: min(900px, calc(100vw - 40px));
+  text-align: center;
+  transform: translate(-50%, -52%);
+  animation: reveal 1.2s both;
+}
+
+.eyebrow, .panel-kicker {
+  margin: 0 0 22px;
+  font-size: 10px;
+  letter-spacing: .42em;
+  color: rgba(139, 255, 233, .75);
+}
+
+.start-screen h1 {
+  margin: 0;
+  font-family: "Songti SC", STSong, "Noto Serif SC", serif;
+  font-size: clamp(48px, 6vw, 82px);
+  line-height: 1.14;
+  font-weight: 500;
+  letter-spacing: -.05em;
+  text-shadow: 0 0 40px rgba(133, 124, 255, .12);
+}
+.start-screen h1 em { color: var(--mint); font-style: normal; text-shadow: 0 0 22px rgba(139,255,233,.3); }
+.lead { margin: 25px 0 34px; color: var(--muted); font-size: 14px; letter-spacing: .1em; }
+
+.primary-button {
+  min-width: 166px;
+  height: 49px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 22px;
+  border: 1px solid rgba(139,255,233,.74);
+  border-radius: 999px;
+  padding: 0 19px 0 25px;
+  color: #cafff5;
+  background: rgba(22, 76, 74, .22);
+  box-shadow: inset 0 0 18px rgba(115, 255, 227, .08), 0 0 34px rgba(81, 255, 224, .1);
+  cursor: pointer;
+  letter-spacing: .16em;
+  font-size: 12px;
+  transition: transform .25s ease, box-shadow .25s ease, background .25s ease;
+}
+.primary-button:hover { transform: translateY(-2px); background: rgba(37, 117, 109, .3); box-shadow: inset 0 0 24px rgba(115,255,227,.14), 0 0 40px rgba(81,255,224,.19); }
+.primary-button i { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: rgba(139,255,233,.14); font-style: normal; }
+.text-button { display: block; margin: 20px auto 0; border: 0; background: transparent; color: rgba(231,239,255,.42); cursor: pointer; font-size: 11px; letter-spacing: .12em; }
+.text-button:hover { color: rgba(231,239,255,.75); }
+
+.countdown-copy {
+  position: absolute;
+  z-index: 6;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.countdown-copy span { transform: translateY(155px); color: rgba(218,234,255,.44); font-size: 11px; letter-spacing: .35em; }
+.countdown-copy strong { opacity: 0; font-size: 1px; }
+
+.wish-copy, .firework-copy {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: calc(50% + 145px);
+  transform: translateX(-50%);
+  text-align: center;
+  animation: reveal .8s both;
+}
+.wish-copy span, .firework-copy span { display: block; color: var(--mint); font-size: 10px; letter-spacing: .5em; }
+.wish-copy p { margin: 10px 0 0; color: rgba(234,240,255,.55); font-size: 12px; letter-spacing: .22em; }
+.firework-copy { top: auto; bottom: 14%; }
+.firework-copy strong { display: block; margin-top: 12px; font-family: "Songti SC", serif; font-size: clamp(24px,3vw,39px); font-weight: 400; letter-spacing: .1em; }
+
+.cake-heading {
+  position: absolute;
+  z-index: 6;
+  top: 8%;
+  left: 50%;
+  width: min(760px, 90vw);
+  transform: translateX(-50%);
+  text-align: center;
+  transition: .65s cubic-bezier(.2,.8,.2,1);
+  animation: reveal 1s .25s both;
+}
+.cake-heading > p { margin: 0 0 8px; color: rgba(139,255,233,.66); font-size: 9px; letter-spacing: .54em; }
+.cake-heading h2 { margin: 0; font-family: "Songti SC", STSong, serif; font-size: clamp(26px, 4vw, 52px); font-weight: 500; letter-spacing: .05em; }
+.cake-heading h2 span { color: var(--mint); }
+.cake-heading blockquote { margin: 12px auto 0; color: rgba(232,238,255,.57); font-family: "Songti SC", serif; font-size: 13px; letter-spacing: .12em; }
+.cake-heading.gallery-heading { top: 4.5%; transform: translateX(-50%) scale(.83); opacity: .84; }
+.gallery-heading blockquote { display: none; }
+
+.experience-controls {
+  position: absolute;
+  z-index: 12;
+  left: 50%;
+  bottom: 7%;
+  transform: translateX(-50%);
+  text-align: center;
+}
+.primary-button.compact { min-width: 174px; height: 41px; font-size: 10px; }
+.experience-controls p { margin: 12px 0 0; color: rgba(223,232,255,.4); font-size: 9px; letter-spacing: .14em; white-space: nowrap; }
+
+.memory-cards { position: absolute; z-index: 8; inset: 0; opacity: 0; visibility: hidden; transition: opacity .7s .25s ease; pointer-events: none; }
+.memory-cards.visible { opacity: 1; visibility: visible; }
+.memory-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(90px, 9.5vw, 135px);
+  padding: 5px;
+  border: 1px solid rgba(166,255,239,.42);
+  border-radius: 4px;
+  background: rgba(7, 10, 28, .78);
+  box-shadow: 0 0 25px rgba(93,255,226,.12);
+  cursor: pointer;
+  transition: opacity .18s linear, box-shadow .25s ease;
+  will-change: transform;
+}
+.memory-card:hover { border-color: var(--mint); box-shadow: 0 0 35px rgba(91,255,225,.35); }
+.card-image {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background-position: center;
+  background-size: cover;
+}
+.card-image > span { color: rgba(255,255,255,.84); font-family: "Songti SC", serif; font-size: 22px; letter-spacing: .14em; text-shadow: 0 2px 10px rgba(0,0,0,.35); }
+.card-caption { display: none; }
+
+.card-modal {
+  position: absolute;
+  z-index: 40;
+  left: 50%;
+  top: 50%;
+  width: min(780px, calc(100vw - 36px));
+  height: min(70vh, 580px);
+  transform: translate(-50%, -50%);
+  display: grid;
+  grid-template-columns: 58% 42%;
+  background: rgba(7,9,27,.84);
+  border: 1px solid rgba(139,255,233,.35);
+  box-shadow: 0 40px 120px rgba(0,0,0,.7), 0 0 50px rgba(113,98,255,.17);
+  backdrop-filter: blur(24px);
+  animation: modalIn .5s cubic-bezier(.2,.85,.2,1) both;
+}
+.modal-visual { display: grid; place-items: center; background-position: center; background-size: cover; overflow: hidden; }
+.modal-visual > span { font-family: "Songti SC", serif; font-size: 70px; letter-spacing: .18em; text-shadow: 0 6px 20px rgba(0,0,0,.25); }
+.modal-copy { padding: 50px 38px; display: flex; flex-direction: column; justify-content: center; }
+.modal-copy span { color: var(--mint); font-size: 9px; letter-spacing: .36em; }
+.modal-copy h3 { margin: 18px 0 10px; font-family: "Songti SC",serif; font-size: 42px; font-weight: 400; }
+.modal-copy p { margin: 0; color: var(--muted); font-size: 13px; line-height: 2; }
+.modal-close {
+  position: absolute;
+  z-index: 3;
+  right: 16px;
+  top: 14px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 50%;
+  background: rgba(0,0,0,.18);
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 200;
+}
+
+.customize-backdrop {
+  position: absolute;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0,2,10,.7);
+  backdrop-filter: blur(14px);
+}
+.customize-panel {
+  position: relative;
+  width: min(500px, 100%);
+  padding: 38px 40px 34px;
+  border: 1px solid rgba(139,255,233,.24);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(17,23,52,.96), rgba(8,9,25,.97));
+  box-shadow: 0 30px 100px rgba(0,0,0,.6), 0 0 50px rgba(97,255,231,.09);
+  animation: modalIn .4s cubic-bezier(.2,.85,.2,1) both;
+  user-select: text;
+}
+.customize-panel h2 { margin: 0 0 28px; font-family: "Songti SC",serif; font-size: 30px; font-weight: 400; }
+.customize-panel label { display: block; margin-top: 18px; }
+.customize-panel label > span { display: block; margin-bottom: 8px; color: rgba(226,236,255,.58); font-size: 11px; letter-spacing: .15em; }
+.customize-panel input:not([type="file"]), .customize-panel textarea {
+  width: 100%;
+  border: 1px solid rgba(163,190,255,.17);
+  border-radius: 8px;
+  outline: none;
+  background: rgba(3,5,16,.52);
+  color: #fff;
+  padding: 12px 14px;
+  transition: border-color .2s ease;
+}
+.customize-panel input:focus, .customize-panel textarea:focus { border-color: rgba(139,255,233,.55); }
+.customize-panel textarea { min-height: 80px; resize: vertical; line-height: 1.7; }
+.upload-label { position: relative; }
+.upload-label input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.upload-label b {
+  display: inline-block;
+  padding: 9px 15px;
+  border: 1px dashed rgba(139,255,233,.45);
+  border-radius: 7px;
+  color: var(--mint);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+}
+.upload-label small { margin-left: 12px; color: rgba(220,228,245,.36); font-size: 9px; }
+.panel-save { width: 100%; margin-top: 25px; }
+
+.camera-preview {
+  position: absolute;
+  z-index: 19;
+  right: 30px;
+  top: 78px;
+  width: 132px;
+  overflow: hidden;
+  border: 1px solid rgba(139,255,233,.24);
+  border-radius: 10px;
+  background: #080b18;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+.camera-preview video { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; transform: scaleX(-1); opacity: .68; }
+.camera-preview span { display: block; padding: 7px; text-align: center; color: rgba(222,255,249,.56); font-size: 8px; letter-spacing: .1em; }
+.camera-preview.motion-seen { border-color: rgba(139,255,233,.72); }
+.camera-preview.off { visibility: hidden; opacity: 0; pointer-events: none; }
+
+.footer-note {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: 21px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(220,230,251,.22);
+  white-space: nowrap;
+  font-family: "Songti SC",serif;
+  font-size: 9px;
+  letter-spacing: .12em;
+}
+.footer-note span { color: rgba(139,255,233,.3); }
+
+@keyframes reveal {
+  from { opacity: 0; transform: translate(-50%, calc(-52% + 20px)); filter: blur(8px); }
+  to { opacity: 1; transform: translate(-50%, -52%); filter: blur(0); }
+}
+.cake-heading { animation-name: headingReveal; }
+@keyframes headingReveal {
+  from { opacity: 0; transform: translate(-50%, 14px); filter: blur(8px); }
+  to { opacity: 1; transform: translate(-50%, 0); filter: blur(0); }
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 24px)) scale(.96); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.customize-panel { animation-name: panelIn; }
+@keyframes panelIn {
+  from { opacity: 0; transform: translateY(20px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 700px) {
+  .topbar { padding: 18px 16px; }
+  .action-label, .brand-copy { display: none; }
+  .icon-button { width: 38px; padding: 0; justify-content: center; }
+  .brand-mark { display: flex; }
+  .start-screen { top: 48%; }
+  .start-screen h1 { font-size: clamp(44px, 14vw, 66px); line-height: 1.25; }
+  .lead { margin-top: 18px; }
+  .cake-heading { top: 10%; }
+  .cake-heading blockquote { max-width: 88vw; line-height: 1.8; }
+  .cake-heading.gallery-heading { top: 7%; }
+  .memory-card { width: 78px; padding: 3px; }
+  .experience-controls { bottom: 8%; }
+  .experience-controls p { white-space: normal; width: 90vw; line-height: 1.5; }
+  .footer-note { bottom: 16px; }
+  .camera-preview { right: 16px; top: 66px; width: 96px; }
+  .card-modal { height: 72vh; grid-template-columns: 1fr; grid-template-rows: 68% 32%; }
+  .modal-copy { padding: 20px 24px; }
+  .modal-copy h3 { margin: 8px 0 3px; font-size: 27px; }
+  .modal-copy p { line-height: 1.5; }
+  .customize-panel { padding: 34px 22px 28px; }
+  .upload-label small { display: block; margin: 8px 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora, .start-screen, .cake-heading, .card-modal, .customize-panel { animation: none !important; }
+}
