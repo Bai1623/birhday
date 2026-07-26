@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Starter Project",
-  description: "A clean starting point for building your site.",
+  title: "星河生日祝福",
+  description: "一份可以用手势展开回忆星球的生日祝福网站。",
   other: {
     "codex-preview": "development",
   },
