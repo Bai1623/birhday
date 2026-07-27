@@ -17,8 +17,8 @@ test("countdown and fireworks are scaled up for a larger celebration", async () 
 
   assert.match(pageSource, /launchFireworks\("grand"\)/);
   assert.match(pageSource, /launchFireworks\("cake"\)/);
-  assert.match(particleSource, /const maxFireworks = 3000/);
+  assert.match(particleSource, /const maxFireworks = 4500/);
   assert.match(particleSource, /launchFireworks\(intensity: FireworkIntensity = "normal"\)/);
   assert.match(particleSource, /isNumber \? 320 :/);
-  assert.match(cssSource, /translateY\(clamp\(180px, 23vw, 260px\)\)/);
+  assert.match(cssSource, /translateY\(clamp\(120px, 14vw, 180px\)\)/);
 });

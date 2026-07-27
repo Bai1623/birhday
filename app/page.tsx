@@ -9,35 +9,90 @@ import {
   useState,
 } from "react";
 import type { HandLandmarker } from "@mediapipe/tasks-vision";
+import {
+  Card,
+  INITIAL_CARDS,
+  SHARE_PARAM,
+  SharedGiftPayload,
+  base64UrlEncode,
+  clamp,
+  coerceSharedGiftPayload,
+  normalizeCardsForExport,
+  parseInlineGiftValue,
+  sanitizeGiftId,
+  sanitizeText,
+} from "./lib/gift-config";
 import { GestureGate, GESTURE_LABELS, classifyHand, createEmaLandmarkSmoother } from "./lib/gesture-core";
 import { ParticleScene } from "./lib/particle-scene";
 
 type Stage = "idle" | "countdown" | "wish" | "fireworks" | "cake" | "gallery";
-type Card = { url?: string; title: string; subtitle: string; color: string; lon: number; lat: number };
-
-const CARD_COPY = [
-  ["遇见", "所有美好如期而至", "linear-gradient(145deg,#ff8eaa,#ffcf9e 50%,#563ca9)"],
-  ["晴天", "愿笑容永远明亮", "linear-gradient(145deg,#62d8ff,#caefff 48%,#ffcd6b)"],
-  ["远方", "去看更大的世界", "linear-gradient(145deg,#23438c,#9b87ff 52%,#f4a5c7)"],
-  ["晚风", "把温柔轻轻收藏", "linear-gradient(145deg,#271f67,#ef83ad 52%,#ffcf9e)"],
-  ["心愿", "每一岁都胜意", "linear-gradient(145deg,#f3be32,#ffef98 48%,#5e9d56)"],
-  ["星光", "永远热烈又自由", "linear-gradient(145deg,#0f2769,#714fc9 50%,#4ee5d1)"],
-];
-
-const INITIAL_CARDS: Card[] = CARD_COPY.map(([title, subtitle, color], index) => ({
-  title,
-  subtitle,
-  color,
-  lon: (index / CARD_COPY.length) * Math.PI * 2,
-  lat: [-0.58, 0.12, 0.6, -0.15, 0.42, -0.46][index],
-}));
 
 const MEDIAPIPE_WASM_PATH = "/mediapipe/wasm";
 const HAND_LANDMARKER_MODEL_PATH = "/mediapipe/hand_landmarker.task";
 
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+type ShareBootstrap = {
+  giftId: string;
+  hasGiftParam: boolean;
+  payload: SharedGiftPayload | null;
+};
+
+const getShareBootstrap = (): ShareBootstrap => {
+  if (typeof window === "undefined") return { giftId: "", hasGiftParam: false, payload: null };
+  const gift = new URLSearchParams(window.location.search).get(SHARE_PARAM);
+  if (!gift) return { giftId: "", hasGiftParam: false, payload: null };
+  const payload = parseInlineGiftValue(gift);
+  return {
+    giftId: payload ? "" : sanitizeGiftId(gift),
+    hasGiftParam: true,
+    payload,
+  };
+};
+
 const isInteractiveTarget = (target: EventTarget | null) =>
   target instanceof HTMLElement && Boolean(target.closest("button,input,textarea,label"));
+
+const isBlobUrl = (value?: string) => Boolean(value?.startsWith("blob:"));
+
+const createInlineShareUrl = (payload: SharedGiftPayload) => {
+  const encoded = base64UrlEncode(JSON.stringify(payload));
+  return `${window.location.origin}${window.location.pathname}?${SHARE_PARAM}=${encodeURIComponent(encoded)}`;
+};
+
+const copyToClipboard = async (value: string) => {
+  if (!navigator.clipboard?.writeText) return false;
+  try {
+    await navigator.clipboard.writeText(value);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+async function compressPhotoForGift(file: File) {
+  if (!file.type.startsWith("image/")) return file;
+  if (file.type === "image/gif" && file.size <= 5 * 1024 * 1024) return file;
+
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return file;
+
+  const maxEdge = 1400;
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, "image/jpeg", 0.82);
+  });
+  if (!blob) return file;
+
+  const name = file.name.replace(/\.[^.]+$/, "") || "birthday-photo";
+  return new File([blob], `${name}.jpg`, { type: "image/jpeg" });
+}
 
 function startBirthdayMusic() {
   const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -77,6 +132,7 @@ export default function Home() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<Stage>("idle");
+  const previousStageRef = useRef<Stage>("idle");
   const particleSceneRef = useRef<ParticleScene | null>(null);
   const pendingMorphRef = useRef<{ kind: "stars" | "text" | "cake" | "sphere"; text?: string }>({ kind: "stars" });
   const yawRef = useRef(0);
@@ -96,6 +152,9 @@ export default function Home() {
   const lastClassifiedGestureRef = useRef("none");
   const timersRef = useRef<number[]>([]);
   const cardsRef = useRef<Card[]>(INITIAL_CARDS);
+  const pendingPhotoFilesRef = useRef<Array<File | null>>(Array.from({ length: 6 }, () => null));
+  const [shareBootstrap] = useState(getShareBootstrap);
+  const initialGift = shareBootstrap.payload;
   const [stage, setStage] = useState<Stage>("idle");
   const [countdown, setCountdown] = useState(5);
   const [cameraOn, setCameraOn] = useState(false);
@@ -103,13 +162,20 @@ export default function Home() {
   const [cameraHint, setCameraHint] = useState("开启手势");
   const [gestureStatus, setGestureStatus] = useState(GESTURE_LABELS.none);
   const [muted, setMuted] = useState(false);
-  const [name, setName] = useState("亲爱的你");
-  const [blessing, setBlessing] = useState("愿你眼里有光，心中有爱，生日快乐，岁岁欢喜。");
-  const [cards, setCards] = useState<Card[]>(INITIAL_CARDS);
+  const [name, setName] = useState(() => initialGift?.name ?? "亲爱的你");
+  const [blessing, setBlessing] = useState(() => initialGift?.blessing ?? "愿你眼里有光，心中有爱，生日快乐，岁岁欢喜。");
+  const [cards, setCards] = useState<Card[]>(() => initialGift?.cards ?? INITIAL_CARDS);
   const [selectedCard, setSelectedCard] = useState<number | null>(null);
   const selectedCardRef = useRef<number | null>(null);
   const [customizing, setCustomizing] = useState(false);
   const [orbit, setOrbit] = useState({ yaw: 0, pitch: 0.06 });
+  const isSharedView = shareBootstrap.hasGiftParam;
+  const [giftLoadStatus, setGiftLoadStatus] = useState<"idle" | "loading" | "ready" | "error">(
+    shareBootstrap.giftId ? "loading" : "idle",
+  );
+  const [giftLoadMessage, setGiftLoadMessage] = useState("");
+  const [shareUrl, setShareUrl] = useState("");
+  const [shareHint, setShareHint] = useState("");
 
   const transition = useCallback((next: Stage) => {
     stageRef.current = next;
@@ -159,12 +225,19 @@ export default function Home() {
       launchFireworks("grand");
     }, 6600));
     timersRef.current.push(window.setTimeout(() => {
+      launchFireworks("grand");
+    }, 7400));
+    timersRef.current.push(window.setTimeout(() => {
+      launchFireworks("grand");
+    }, 8200));
+    timersRef.current.push(window.setTimeout(() => {
       transition("cake");
       morphTo("cake");
       launchFireworks("cake");
     }, 9400));
-    timersRef.current.push(window.setTimeout(() => launchFireworks("cake"), 10300));
-    timersRef.current.push(window.setTimeout(() => launchFireworks("cake"), 11200));
+    timersRef.current.push(window.setTimeout(() => launchFireworks("grand"), 10200));
+    timersRef.current.push(window.setTimeout(() => launchFireworks("cake"), 10900));
+    timersRef.current.push(window.setTimeout(() => launchFireworks("grand"), 11800));
   }, [clearSequence, launchFireworks, morphTo, muted, transition]);
 
   const toggleMute = useCallback(() => {
@@ -272,24 +345,82 @@ export default function Home() {
     if (stageRef.current === "cake") {
       transition("gallery");
       morphTo("sphere");
-      void startCamera();
     } else if (stageRef.current === "gallery") {
       setSelectedCard(null);
       transition("cake");
       morphTo("cake");
     }
-  }, [morphTo, startCamera, transition]);
+  }, [morphTo, transition]);
 
-  const onPhotoUpload = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+  const onPhotoUpload = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? []).slice(0, 6);
     if (!files.length) return;
-    const next = INITIAL_CARDS.map((card) => ({ ...card }));
-    files.forEach((file, index) => {
+    setShareHint("正在处理照片，稍等一下。");
+    const next = cardsRef.current.map((card) => ({ ...card }));
+    const preparedFiles = await Promise.all(files.map((file) => compressPhotoForGift(file)));
+    preparedFiles.forEach((file, index) => {
+      const previousUrl = cardsRef.current[index]?.url;
+      if (previousUrl && isBlobUrl(previousUrl)) URL.revokeObjectURL(previousUrl);
+      pendingPhotoFilesRef.current[index] = file;
       next[index].url = URL.createObjectURL(file);
       next[index].title = file.name.replace(/\.[^.]+$/, "").slice(0, 12) || next[index].title;
     });
     setCards(next);
+    setShareHint("照片已准备好，生成链接后对方就能看到。");
   }, []);
+
+  const onPhotoUrlChange = useCallback((index: number, value: string) => {
+    if (value.trim()) pendingPhotoFilesRef.current[index] = null;
+    setCards((prev) => prev.map((card, cursor) => (cursor === index ? { ...card, url: sanitizeText(value, "", 2048) } : card)));
+  }, []);
+
+  const sharePayload = useCallback(() => ({
+    v: 1 as const,
+    name: sanitizeText(name, "亲爱的你", 16),
+    blessing: sanitizeText(blessing, "愿你眼里有光，心中有爱，生日快乐，岁岁欢喜。", 120),
+    cards: normalizeCardsForExport(cards),
+  }), [blessing, cards, name]);
+
+  const generateShareLink = useCallback(async () => {
+    if (typeof window === "undefined") return;
+    const payload = sharePayload();
+    const localFiles = pendingPhotoFilesRef.current.filter(Boolean) as File[];
+    setShareHint("正在生成礼物链接。");
+
+    try {
+      const form = new FormData();
+      form.set("payload", JSON.stringify(payload));
+      pendingPhotoFilesRef.current.forEach((file, index) => {
+        if (file) form.set(`photo${index}`, file);
+      });
+      const response = await fetch("/api/gifts", {
+        method: "POST",
+        body: form,
+      });
+      const result = await response.json().catch(() => null) as { shareUrl?: string; error?: string } | null;
+      if (!response.ok || !result?.shareUrl) {
+        throw new Error(result?.error ?? "保存礼物失败。");
+      }
+
+      setShareUrl(result.shareUrl);
+      const copied = await copyToClipboard(result.shareUrl);
+      setShareHint(copied ? "礼物短链接已生成并复制，可直接发给对方。" : "礼物短链接已生成，请手动复制下方链接。");
+      return;
+    } catch (error) {
+      console.warn("Gift save failed; falling back to inline link when possible.", error);
+    }
+
+    if (localFiles.length) {
+      setShareUrl("");
+      setShareHint("当前环境暂时不能保存照片，所以还不能生成可分享的照片链接。部署这版后重新生成即可。");
+      return;
+    }
+
+    const fallbackUrl = createInlineShareUrl(payload);
+    setShareUrl(fallbackUrl);
+    const copied = await copyToClipboard(fallbackUrl);
+    setShareHint(copied ? "已生成兼容链接并复制；照片需要使用可公开访问的图片链接。" : "已生成兼容链接；照片需要使用可公开访问的图片链接。");
+  }, [sharePayload]);
 
   const getFrontCardIndex = useCallback(() => {
     const cosPitch = Math.cos(pitchRef.current);
@@ -329,16 +460,48 @@ export default function Home() {
   }, [getFrontCardIndex, toggleGallery]);
 
   useEffect(() => {
-    stageRef.current = stage;
-  }, [stage]);
-
-  useEffect(() => {
-    cardsRef.current = cards;
-  }, [cards]);
-
-  useEffect(() => {
     selectedCardRef.current = selectedCard;
   }, [selectedCard]);
+
+  useEffect(() => {
+    if (!shareBootstrap.giftId) return;
+    let cancelled = false;
+
+    fetch(`/api/gifts/${encodeURIComponent(shareBootstrap.giftId)}`, { cache: "no-store" })
+      .then(async (response) => {
+        const result = await response.json().catch(() => null) as { gift?: { payload?: unknown }; error?: string } | null;
+        if (!response.ok) throw new Error(result?.error ?? "礼物链接加载失败。");
+        const payload = coerceSharedGiftPayload(result?.gift?.payload);
+        if (!payload) throw new Error("礼物内容不完整。");
+        return payload;
+      })
+      .then((payload) => {
+        if (cancelled) return;
+        setName(payload.name);
+        setBlessing(payload.blessing);
+        setCards(payload.cards);
+        setGiftLoadStatus("ready");
+        setGiftLoadMessage("");
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setGiftLoadStatus("error");
+        setGiftLoadMessage(error instanceof Error ? error.message : "礼物链接加载失败。");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [shareBootstrap.giftId]);
+
+  useEffect(() => {
+    if (previousStageRef.current !== "gallery" && stage === "gallery") {
+      void startCamera();
+    }
+    previousStageRef.current = stage;
+    stageRef.current = stage;
+    cardsRef.current = cards;
+  }, [cards, stage, startCamera]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -466,6 +629,8 @@ export default function Home() {
     return () => window.clearInterval(refresh);
   }, [stage]);
 
+  const canStartGift = giftLoadStatus !== "loading" && giftLoadStatus !== "error";
+
   return (
     <main
       className={`experience stage-${stage}`}
@@ -480,10 +645,12 @@ export default function Home() {
       <div className="vignette" />
 
       <header className="topbar">
-        <button className="icon-button brand-mark" onClick={() => setCustomizing(true)} aria-label="定制祝福">
-          <span className="spark-symbol">✦</span>
-          <span className="brand-copy">FOR YOU</span>
-        </button>
+        {!isSharedView && (
+          <button className="icon-button brand-mark" onClick={() => setCustomizing(true)} aria-label="定制祝福">
+            <span className="spark-symbol">✦</span>
+            <span className="brand-copy">FOR YOU</span>
+          </button>
+        )}
         <div className="top-actions">
           {stage !== "idle" && (
             <button className="icon-button" onClick={toggleMute} aria-label={muted ? "打开音乐" : "关闭音乐"}>
@@ -505,11 +672,19 @@ export default function Home() {
         <section className="start-screen">
           <p className="eyebrow">A LITTLE UNIVERSE MADE FOR YOU</p>
           <h1>有一份来自星河的<br /><em>生日惊喜</em></h1>
-          <p className="lead">把声音打开，给自己留四十秒。</p>
-          <button className="primary-button" onClick={begin}>
-            <span>开启惊喜</span><i>→</i>
+          <p className="lead">
+            {giftLoadStatus === "loading"
+              ? "正在装载这份专属惊喜。"
+              : giftLoadStatus === "error"
+                ? giftLoadMessage || "礼物链接加载失败。"
+                : isSharedView
+                  ? "这是为你准备的一份生日惊喜。"
+                  : "把声音打开，给自己留四十秒。"}
+          </p>
+          <button className="primary-button" onClick={begin} disabled={!canStartGift}>
+            <span>{giftLoadStatus === "loading" ? "正在准备" : "开启惊喜"}</span><i>→</i>
           </button>
-          <button className="text-button" onClick={() => setCustomizing(true)}>先定制名字与照片</button>
+          {!isSharedView && <button className="text-button" onClick={() => setCustomizing(true)}>先定制名字与照片</button>}
         </section>
       )}
 
@@ -597,7 +772,7 @@ export default function Home() {
         </div>
       )}
 
-      {customizing && (
+      {customizing && !isSharedView && (
         <div className="customize-backdrop" onClick={() => setCustomizing(false)}>
           <section className="customize-panel" onClick={(event) => event.stopPropagation()}>
             <button className="modal-close" onClick={() => setCustomizing(false)} aria-label="关闭">×</button>
@@ -615,11 +790,47 @@ export default function Home() {
               <span>回忆照片（最多 6 张）</span>
               <input type="file" accept="image/*" multiple onChange={onPhotoUpload} />
               <b>选择照片</b>
-              <small>照片只在当前设备中显示，不会上传</small>
+              <small>建议填写可访问的图片链接，保证分享后能看到照片</small>
             </label>
-            <button className="primary-button panel-save" onClick={() => setCustomizing(false)}>
-              <span>保存祝福</span><i>✓</i>
-            </button>
+            {cards.map((card, index) => (
+              <label key={`photo-${index}`}>
+                <span>照片 {index + 1} 图片链接（可选）</span>
+                <input
+                  value={isBlobUrl(card.url) ? "" : card.url ?? ""}
+                  placeholder="https://..."
+                  onChange={(event) => onPhotoUrlChange(index, event.target.value)}
+                />
+              </label>
+            ))}
+            <div className="share-tools">
+              <button className="primary-button panel-share" onClick={generateShareLink}>
+                <span>生成分享链接</span><i>↗</i>
+              </button>
+              <button className="primary-button panel-save" onClick={() => setCustomizing(false)}>
+                <span>保存祝福</span><i>✓</i>
+              </button>
+            </div>
+            {shareHint && <p className="share-hint">{shareHint}</p>}
+            {shareUrl && (
+              <div className="share-link-wrap">
+                <span className="share-link-label">分享链接</span>
+                <textarea
+                  className="share-link"
+                  value={shareUrl}
+                  readOnly
+                  rows={3}
+                  onFocus={(event) => event.currentTarget.select()}
+                />
+                <span className="share-link-actions">
+                  <button type="button" onClick={() => { void copyToClipboard(shareUrl).then((copied) => setShareHint(copied ? "链接已复制。" : "复制失败，请手动复制。")); }}>
+                    复制链接
+                  </button>
+                  <button type="button" onClick={() => window.open(shareUrl, "_blank", "noopener,noreferrer")}>
+                    预览礼物
+                  </button>
+                </span>
+              </div>
+            )}
           </section>
         </div>
       )}

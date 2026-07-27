@@ -11,6 +11,7 @@ type FireworkParticle = {
   vy: number;
   life: number;
   hue: number;
+  size: number;
 };
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -176,7 +177,7 @@ export class ParticleScene {
     this.alphas = new Float32Array(count);
     this.sizes = new Float32Array(count);
 
-    const maxFireworks = 3000;
+    const maxFireworks = 4500;
     this.fireworkPositions = new Float32Array(maxFireworks * 3);
     this.fireworkColors = new Float32Array(maxFireworks * 3);
     this.fireworkAlphas = new Float32Array(maxFireworks);
@@ -249,6 +250,7 @@ export class ParticleScene {
   }
 
   launchFireworks(intensity: FireworkIntensity = "normal") {
+    const isMobile = this.width < 700;
     const grandBursts = [
       [-0.42, 0.24, 330],
       [-0.24, 0.18, 205],
@@ -261,6 +263,11 @@ export class ParticleScene {
       [0.36, -0.01, 28],
       [-0.04, -0.14, 300],
       [0.04, 0.12, 128],
+      [-0.22, 0.08, 210],
+      [0.22, 0.08, 250],
+      [0.0, -0.18, 12],
+      [-0.18, -0.2, 290],
+      [0.18, -0.2, 310],
     ];
     const cakeBursts = [
       [-0.36, 0.1, 330],
@@ -279,14 +286,21 @@ export class ParticleScene {
       [0.19, 0.28, 315],
     ];
     const bursts = intensity === "grand" ? grandBursts : intensity === "cake" ? cakeBursts : normalBursts;
-    const particlesPerBurst = intensity === "grand" ? 300 : intensity === "cake" ? 230 : 180;
-    const delayStep = intensity === "grand" ? 135 : intensity === "cake" ? 190 : 330;
-    const baseLife = intensity === "grand" ? 1.05 : intensity === "cake" ? 0.92 : 0.8;
+    const particlesPerBurst = intensity === "grand"
+      ? (isMobile ? 230 : 340)
+      : intensity === "cake"
+        ? (isMobile ? 180 : 230)
+        : (isMobile ? 140 : 180);
+    const delayStep = intensity === "grand" ? 100 : intensity === "cake" ? 170 : 300;
+    const baseLife = intensity === "grand" ? 1.15 : intensity === "cake" ? 0.92 : 0.8;
+    const speedBase = intensity === "grand" ? 2 : intensity === "cake" ? 1.8 : 1.6;
+    const speedSpread = intensity === "grand" ? 7.2 : intensity === "cake" ? 5.4 : 4.8;
     bursts.forEach(([px, py, hue], burstIndex) => {
       window.setTimeout(() => {
         for (let i = 0; i < particlesPerBurst; i++) {
           const angle = Math.random() * Math.PI * 2;
-          const speed = 1.8 + Math.random() * (intensity === "grand" ? 6.6 : 5.2);
+          const speed = speedBase + Math.random() * speedSpread;
+          const relativeSize = intensity === "grand" ? 2.6 : intensity === "cake" ? 2.2 : 2;
           this.fireworks.push({
             x: this.width * px,
             y: this.height * py,
@@ -295,6 +309,7 @@ export class ParticleScene {
             vy: Math.sin(angle) * speed,
             life: baseLife + Math.random() * 0.65,
             hue: hue + Math.random() * 35,
+            size: relativeSize + Math.random() * (isMobile ? 0.6 : 1.1),
           });
         }
       }, burstIndex * delayStep);
@@ -410,7 +425,7 @@ export class ParticleScene {
       this.fireworkColors[index + 1] = g;
       this.fireworkColors[index + 2] = b;
       this.fireworkAlphas[i] = firework.life;
-      this.fireworkSizes[i] = 2.6;
+      this.fireworkSizes[i] = firework.size * clamp(0.55 + firework.life * 0.55, 0.6, 1.4);
     });
   }
 }
