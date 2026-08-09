@@ -516,7 +516,8 @@ export default function Home() {
   }, [shareBootstrap.giftId]);
 
   useEffect(() => {
-    if (previousStageRef.current !== "gallery" && stage === "gallery") {
+    const shouldAutoStartCamera = stage === "cake" || stage === "gallery";
+    if (previousStageRef.current !== stage && shouldAutoStartCamera) {
       void startCamera();
     }
     if (stage !== "gallery") handMotionRef.current = null;

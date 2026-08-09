@@ -12,6 +12,14 @@ test("gallery entry starts hand tracking without disabling controls", async () =
   assert.match(pageSource, /closest\("button,input,textarea,label"\)/);
 });
 
+test("cake stage starts hand tracking before the gallery is opened", async () => {
+  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(pageSource, /stage === "cake" \|\| stage === "gallery"/);
+  assert.match(pageSource, /previousStageRef\.current !== stage && shouldAutoStartCamera/);
+  assert.match(pageSource, /if \(gesture === "open" && stageRef\.current === "cake"\)/);
+});
+
 test("hand orbit control accumulates swipes instead of clamping to absolute palm position", async () => {
   const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
