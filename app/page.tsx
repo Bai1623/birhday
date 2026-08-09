@@ -24,6 +24,7 @@ import {
   sanitizeText,
 } from "./lib/gift-config";
 import { GestureGate, GESTURE_LABELS, classifyHand, createEmaLandmarkSmoother } from "./lib/gesture-core";
+import { applyHandOrbitControl } from "./lib/hand-orbit-control";
 import { ParticleScene } from "./lib/particle-scene";
 
 type Stage = "idle" | "countdown" | "wish" | "fireworks" | "cake" | "gallery";
@@ -141,6 +142,7 @@ export default function Home() {
   const yawTargetRef = useRef(0);
   const pitchTargetRef = useRef(0.06);
   const handControlUntilRef = useRef(0);
+  const handMotionRef = useRef<ReturnType<typeof applyHandOrbitControl> | null>(null);
   const gestureBlockedUntilRef = useRef(0);
   const dragRef = useRef({ active: false, x: 0, y: 0 });
   const orbitPausedRef = useRef(false);
@@ -359,6 +361,7 @@ export default function Home() {
 
   const closeGallery = useCallback(() => {
     gestureBlockedUntilRef.current = performance.now() + 1200;
+    handMotionRef.current = null;
     setSelectedCard(null);
     transition("cake");
     morphTo("cake");
@@ -516,6 +519,7 @@ export default function Home() {
     if (previousStageRef.current !== "gallery" && stage === "gallery") {
       void startCamera();
     }
+    if (stage !== "gallery") handMotionRef.current = null;
     previousStageRef.current = stage;
     stageRef.current = stage;
     cardsRef.current = cards;
@@ -574,9 +578,19 @@ export default function Home() {
 
         if (classified.center && stageRef.current === "gallery") {
           const mirroredX = 1 - classified.center.x;
-          yawTargetRef.current = (mirroredX - 0.5) * 3.2;
-          pitchTargetRef.current = clamp((classified.center.y - 0.5) * 1.55, -0.72, 0.72);
-          handControlUntilRef.current = time + 650;
+          handMotionRef.current = applyHandOrbitControl(
+            handMotionRef.current,
+            mirroredX,
+            classified.center.y,
+            time,
+            (yawDelta: number, pitchDelta: number) => {
+              yawTargetRef.current += yawDelta;
+              pitchTargetRef.current = clamp(pitchTargetRef.current + pitchDelta, -0.86, 0.86);
+            },
+          );
+          handControlUntilRef.current = time + 900;
+        } else if (!classified.center) {
+          handMotionRef.current = null;
         }
 
         const gated = gestureGateRef.current.update(classified.gesture, time);
@@ -614,8 +628,8 @@ export default function Home() {
     if (!dragRef.current.active || stage !== "gallery") return;
     const dx = event.clientX - dragRef.current.x;
     const dy = event.clientY - dragRef.current.y;
-    yawTargetRef.current += dx * 0.008;
-    pitchTargetRef.current = clamp(pitchTargetRef.current + dy * 0.006, -0.72, 0.72);
+    yawTargetRef.current += dx * 0.01;
+    pitchTargetRef.current = clamp(pitchTargetRef.current + dy * 0.007, -0.86, 0.86);
     dragRef.current.x = event.clientX;
     dragRef.current.y = event.clientY;
   };

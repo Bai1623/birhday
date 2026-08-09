@@ -12,6 +12,14 @@ test("gallery entry starts hand tracking without disabling controls", async () =
   assert.match(pageSource, /closest\("button,input,textarea,label"\)/);
 });
 
+test("hand orbit control accumulates swipes instead of clamping to absolute palm position", async () => {
+  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(pageSource, /applyHandOrbitControl/);
+  assert.match(pageSource, /yawTargetRef\.current \+= yawDelta/);
+  assert.doesNotMatch(pageSource, /yawTargetRef\.current = \(mirroredX - 0\.5\) \* 3\.2/);
+});
+
 test("countdown and fireworks are scaled up for a larger celebration", async () => {
   const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const particleSource = await readFile(new URL("../app/lib/particle-scene.ts", import.meta.url), "utf8");
