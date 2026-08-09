@@ -6,7 +6,9 @@ test("gallery entry starts hand tracking without disabling controls", async () =
   const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
 
   assert.match(pageSource, /const startCamera = useCallback/);
+  assert.match(pageSource, /const openGallery = useCallback/);
   assert.match(pageSource, /void startCamera\(\);/);
+  assert.match(pageSource, /gestureBlockedUntilRef\.current = performance\.now\(\) \+ 1200/);
   assert.match(pageSource, /closest\("button,input,textarea,label"\)/);
 });
 

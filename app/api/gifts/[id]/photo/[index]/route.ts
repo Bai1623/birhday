@@ -1,4 +1,7 @@
 import {
+  MAX_GIFT_CARDS,
+} from "@/app/lib/gift-config";
+import {
   getGiftMediaBucket,
   giftPhotoKey,
   jsonError,
@@ -14,7 +17,7 @@ export async function GET(_request: Request, context: GiftPhotoRouteContext) {
   try {
     const { id, index: rawIndex } = await context.params;
     const index = Number(rawIndex);
-    if (!Number.isInteger(index) || index < 0 || index > 5) {
+    if (!Number.isInteger(index) || index < 0 || index >= MAX_GIFT_CARDS) {
       return jsonError("照片编号不正确。", 400);
     }
 

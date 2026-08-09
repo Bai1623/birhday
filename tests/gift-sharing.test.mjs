@@ -6,6 +6,7 @@ test("gift sharing uses durable API storage instead of blob-only links", async (
   const hosting = JSON.parse(await readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"));
   const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const routeSource = await readFile(new URL("../app/api/gifts/route.ts", import.meta.url), "utf8");
+  const photoRouteSource = await readFile(new URL("../app/api/gifts/[id]/photo/[index]/route.ts", import.meta.url), "utf8");
   const giftConfigSource = await readFile(new URL("../app/lib/gift-config.ts", import.meta.url), "utf8");
 
   assert.equal(hosting.d1, "DB");
@@ -15,5 +16,7 @@ test("gift sharing uses durable API storage instead of blob-only links", async (
   assert.match(pageSource, /isBlobUrl\(card\.url\) \? "" : card\.url/);
   assert.match(routeSource, /bucket\.put\(giftPhotoKey\(id, index\)/);
   assert.match(routeSource, /saveGiftPayload\(id, savedPayload\)/);
+  assert.match(photoRouteSource, /index >= MAX_GIFT_CARDS/);
   assert.match(giftConfigSource, /parseInlineGiftValue/);
+  assert.match(giftConfigSource, /MAX_GIFT_CARDS = 10/);
 });

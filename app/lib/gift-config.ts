@@ -8,6 +8,7 @@ export type SharedGiftPayload = {
 };
 
 export const SHARE_PARAM = "gift";
+export const MAX_GIFT_CARDS = 10;
 
 export const CARD_COPY = [
   ["遇见", "所有美好如期而至", "linear-gradient(145deg,#ff8eaa,#ffcf9e 50%,#563ca9)"],
@@ -16,6 +17,10 @@ export const CARD_COPY = [
   ["晚风", "把温柔轻轻收藏", "linear-gradient(145deg,#271f67,#ef83ad 52%,#ffcf9e)"],
   ["心愿", "每一岁都胜意", "linear-gradient(145deg,#f3be32,#ffef98 48%,#5e9d56)"],
   ["星光", "永远热烈又自由", "linear-gradient(145deg,#0f2769,#714fc9 50%,#4ee5d1)"],
+  ["合照", "把今天记成永恒", "linear-gradient(145deg,#2c8f7c,#b9ffe9 48%,#8066ff)"],
+  ["月色", "温柔会替你发光", "linear-gradient(145deg,#13213f,#6ab7ff 48%,#f7aac5)"],
+  ["热烈", "愿喜欢都有回响", "linear-gradient(145deg,#e75677,#ffd166 48%,#2d6cdf)"],
+  ["未来", "一路闪耀一路自由", "linear-gradient(145deg,#122c28,#7df5cf 46%,#dd8cff)"],
 ] as const;
 
 export const INITIAL_CARDS: Card[] = CARD_COPY.map(([title, subtitle, color], index) => ({
@@ -23,7 +28,7 @@ export const INITIAL_CARDS: Card[] = CARD_COPY.map(([title, subtitle, color], in
   subtitle,
   color,
   lon: (index / CARD_COPY.length) * Math.PI * 2,
-  lat: [-0.58, 0.12, 0.6, -0.15, 0.42, -0.46][index],
+  lat: [-0.62, -0.24, 0.18, 0.56, -0.44, 0.02, 0.42, -0.08, 0.68, -0.5][index],
 }));
 
 export const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
@@ -58,7 +63,7 @@ export function coerceSharedGiftPayload(value: unknown): SharedGiftPayload | nul
   const parsed = value as Partial<SharedGiftPayload> | null;
   if (!parsed || typeof parsed !== "object" || parsed.v !== 1) return null;
   const cards = Array.isArray(parsed.cards)
-    ? parsed.cards.slice(0, 6).map((card, index) => {
+    ? parsed.cards.slice(0, MAX_GIFT_CARDS).map((card, index) => {
       const fallback = INITIAL_CARDS[index % INITIAL_CARDS.length];
       const rawUrl = typeof card?.url === "string" ? card.url.trim() : "";
       return {
@@ -81,7 +86,7 @@ export function coerceSharedGiftPayload(value: unknown): SharedGiftPayload | nul
 }
 
 export const normalizeCardsForExport = (cards: Card[]) =>
-  cards.slice(0, 6).map((card) => ({
+  cards.slice(0, MAX_GIFT_CARDS).map((card) => ({
     url: typeof card.url === "string" && !card.url.startsWith("blob:") ? sanitizeText(card.url, "", 2048) : "",
     title: sanitizeText(card.title, "回忆", 16),
     subtitle: sanitizeText(card.subtitle, "", 32),

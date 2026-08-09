@@ -12,6 +12,7 @@ import type { HandLandmarker } from "@mediapipe/tasks-vision";
 import {
   Card,
   INITIAL_CARDS,
+  MAX_GIFT_CARDS,
   SHARE_PARAM,
   SharedGiftPayload,
   base64UrlEncode,
@@ -140,19 +141,21 @@ export default function Home() {
   const yawTargetRef = useRef(0);
   const pitchTargetRef = useRef(0.06);
   const handControlUntilRef = useRef(0);
+  const gestureBlockedUntilRef = useRef(0);
   const dragRef = useRef({ active: false, x: 0, y: 0 });
   const orbitPausedRef = useRef(false);
   const audioRef = useRef<AudioContext | null>(null);
   const animationRef = useRef(0);
   const inferenceRef = useRef(0);
   const streamRef = useRef<MediaStream | null>(null);
+  const cameraStartingRef = useRef(false);
   const handLandmarkerRef = useRef<HandLandmarker | null>(null);
   const gestureGateRef = useRef(new GestureGate({ requiredFrames: 6, cooldownMs: 800, lostHoldMs: 650 }));
   const smoothLandmarksRef = useRef(createEmaLandmarkSmoother(0.36));
   const lastClassifiedGestureRef = useRef("none");
   const timersRef = useRef<number[]>([]);
   const cardsRef = useRef<Card[]>(INITIAL_CARDS);
-  const pendingPhotoFilesRef = useRef<Array<File | null>>(Array.from({ length: 6 }, () => null));
+  const pendingPhotoFilesRef = useRef<Array<File | null>>(Array.from({ length: MAX_GIFT_CARDS }, () => null));
   const [shareBootstrap] = useState(getShareBootstrap);
   const initialGift = shareBootstrap.payload;
   const [stage, setStage] = useState<Stage>("idle");
@@ -252,6 +255,7 @@ export default function Home() {
   }, []);
 
   const stopCamera = useCallback(() => {
+    cameraStartingRef.current = false;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -286,49 +290,55 @@ export default function Home() {
   }, []);
 
   const startCamera = useCallback(async () => {
-    if (streamRef.current && !handTrackingReady) {
+    if (cameraStartingRef.current) return;
+    cameraStartingRef.current = true;
+    try {
+      if (streamRef.current && !handTrackingReady) {
+        try {
+          setCameraHint("AI 初始化");
+          await initHandLandmarker();
+          setHandTrackingReady(true);
+          setCameraHint("手势控制中");
+          setGestureStatus(GESTURE_LABELS.none);
+        } catch (error) {
+          console.warn("HandLandmarker initialization failed", error);
+          setCameraHint("AI初始化失败");
+          setGestureStatus("未检测到手");
+        }
+        return;
+      }
+
       try {
+        setCameraHint("请允许相机");
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 320, height: 240, facingMode: "user" },
+          audio: false,
+        });
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          await videoRef.current.play();
+        }
+        setCameraOn(true);
+        setGestureStatus(GESTURE_LABELS.none);
         setCameraHint("AI 初始化");
         await initHandLandmarker();
         setHandTrackingReady(true);
         setCameraHint("手势控制中");
-        setGestureStatus(GESTURE_LABELS.none);
       } catch (error) {
-        console.warn("HandLandmarker initialization failed", error);
+        console.warn("Camera or HandLandmarker initialization failed", error);
+        if (!streamRef.current) {
+          stopCamera();
+          setCameraHint("摄像头不可用");
+          window.setTimeout(() => setCameraHint("开启手势"), 2400);
+          return;
+        }
+        setHandTrackingReady(false);
         setCameraHint("AI初始化失败");
         setGestureStatus("未检测到手");
       }
-      return;
-    }
-
-    try {
-      setCameraHint("请允许相机");
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 320, height: 240, facingMode: "user" },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setCameraOn(true);
-      setGestureStatus(GESTURE_LABELS.none);
-      setCameraHint("AI 初始化");
-      await initHandLandmarker();
-      setHandTrackingReady(true);
-      setCameraHint("手势控制中");
-    } catch (error) {
-      console.warn("Camera or HandLandmarker initialization failed", error);
-      if (!streamRef.current) {
-        stopCamera();
-        setCameraHint("摄像头不可用");
-        window.setTimeout(() => setCameraHint("开启手势"), 2400);
-        return;
-      }
-      setHandTrackingReady(false);
-      setCameraHint("AI初始化失败");
-      setGestureStatus("未检测到手");
+    } finally {
+      cameraStartingRef.current = false;
     }
   }, [handTrackingReady, initHandLandmarker, stopCamera]);
 
@@ -341,19 +351,26 @@ export default function Home() {
     await startCamera();
   }, [handTrackingReady, startCamera, stopCamera]);
 
-  const toggleGallery = useCallback(() => {
-    if (stageRef.current === "cake") {
-      transition("gallery");
-      morphTo("sphere");
-    } else if (stageRef.current === "gallery") {
-      setSelectedCard(null);
-      transition("cake");
-      morphTo("cake");
-    }
+  const openGallery = useCallback(() => {
+    transition("gallery");
+    morphTo("sphere");
+    void startCamera();
+  }, [morphTo, startCamera, transition]);
+
+  const closeGallery = useCallback(() => {
+    gestureBlockedUntilRef.current = performance.now() + 1200;
+    setSelectedCard(null);
+    transition("cake");
+    morphTo("cake");
   }, [morphTo, transition]);
 
+  const toggleGallery = useCallback(() => {
+    if (stageRef.current === "cake") openGallery();
+    else if (stageRef.current === "gallery") closeGallery();
+  }, [closeGallery, openGallery]);
+
   const onPhotoUpload = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? []).slice(0, 6);
+    const files = Array.from(event.target.files ?? []).slice(0, MAX_GIFT_CARDS);
     if (!files.length) return;
     setShareHint("正在处理照片，稍等一下。");
     const next = cardsRef.current.map((card) => ({ ...card }));
@@ -438,15 +455,16 @@ export default function Home() {
   }, []);
 
   const handleGestureEvent = useCallback((gesture: string) => {
+    if (performance.now() < gestureBlockedUntilRef.current) return;
     if (gesture === "open" && stageRef.current === "cake") {
-      toggleGallery();
+      openGallery();
       return;
     }
     if (gesture === "fist" && stageRef.current === "gallery") {
       if (selectedCardRef.current !== null) {
         setSelectedCard(null);
       } else {
-        toggleGallery();
+        closeGallery();
       }
       return;
     }
@@ -457,7 +475,7 @@ export default function Home() {
         setSelectedCard(getFrontCardIndex());
       }
     }
-  }, [getFrontCardIndex, toggleGallery]);
+  }, [closeGallery, getFrontCardIndex, openGallery]);
 
   useEffect(() => {
     selectedCardRef.current = selectedCard;
@@ -787,7 +805,7 @@ export default function Home() {
               <textarea value={blessing} maxLength={60} onChange={(event) => setBlessing(event.target.value)} />
             </label>
             <label className="upload-label">
-              <span>回忆照片（最多 6 张）</span>
+              <span>回忆照片（最多 10 张）</span>
               <input type="file" accept="image/*" multiple onChange={onPhotoUpload} />
               <b>选择照片</b>
               <small>建议填写可访问的图片链接，保证分享后能看到照片</small>
