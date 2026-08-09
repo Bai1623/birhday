@@ -59,3 +59,7 @@ test("hand orbit control applies continuous movement with tuned yaw gain", () =>
 
   assert.equal(Number(deltas.yaw.toFixed(2)), Number((0.04 * HAND_YAW_DELTA_GAIN).toFixed(2)));
 });
+
+test("hand orbit control uses calmer yaw tuning for gesture control", () => {
+  assert.equal(HAND_YAW_DELTA_GAIN, 8.2);
+});

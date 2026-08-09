@@ -28,6 +28,13 @@ test("hand orbit control accumulates swipes instead of clamping to absolute palm
   assert.doesNotMatch(pageSource, /yawTargetRef\.current = \(mirroredX - 0\.5\) \* 3\.2/);
 });
 
+test("photo selection supports point gesture as a pinch fallback", async () => {
+  const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
+
+  assert.match(pageSource, /gesture === "pinch" \|\| gesture === "point"/);
+  assert.match(pageSource, /食指点选\/捏合可放大/);
+});
+
 test("countdown and fireworks are scaled up for a larger celebration", async () => {
   const pageSource = await readFile(new URL("../app/page.tsx", import.meta.url), "utf8");
   const particleSource = await readFile(new URL("../app/lib/particle-scene.ts", import.meta.url), "utf8");

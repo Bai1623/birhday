@@ -42,6 +42,21 @@ const makeHand = (shape) => {
     points[20] = { x: 0.7, y: 0.31, z: 0 };
   }
 
+  if (shape === "curledPinch") {
+    points[4] = { x: 0.455, y: 0.62, z: 0 };
+    points[8] = { x: 0.465, y: 0.63, z: 0 };
+    points[12] = { x: 0.5, y: 0.66, z: 0 };
+    points[16] = { x: 0.56, y: 0.66, z: 0 };
+    points[20] = { x: 0.62, y: 0.67, z: 0 };
+  }
+
+  if (shape === "point") {
+    points[8] = { x: 0.42, y: 0.22, z: 0 };
+    points[12] = { x: 0.5, y: 0.66, z: 0 };
+    points[16] = { x: 0.56, y: 0.66, z: 0 };
+    points[20] = { x: 0.62, y: 0.67, z: 0 };
+  }
+
   return points;
 };
 
@@ -49,6 +64,14 @@ test("classifies 21-landmark open palm, fist, and pinch", () => {
   assert.equal(classifyHand(makeHand("open"), "none").gesture, "open");
   assert.equal(classifyHand(makeHand("fist"), "none").gesture, "fist");
   assert.equal(classifyHand(makeHand("pinch"), "none").gesture, "pinch");
+});
+
+test("classifies curled pinch before fist to avoid accidental close", () => {
+  assert.equal(classifyHand(makeHand("curledPinch"), "none").gesture, "pinch");
+});
+
+test("classifies index finger point as a photo selection gesture", () => {
+  assert.equal(classifyHand(makeHand("point"), "none").gesture, "point");
 });
 
 test("calculates palm center from wrist and MCP landmarks", () => {

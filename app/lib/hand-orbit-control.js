@@ -6,7 +6,7 @@ export const HAND_RETURN_RELEASE_TRAVEL = 0.085;
 export const HAND_SWIPE_MIN_TRAVEL = 0.12;
 export const HAND_SWIPE_MAX_MS = 900;
 export const HAND_SWIPE_COOLDOWN_MS = 280;
-export const HAND_YAW_DELTA_GAIN = 12.5;
+export const HAND_YAW_DELTA_GAIN = 8.2;
 export const HAND_PITCH_DELTA_GAIN = 5.4;
 
 const createMotionState = (x, y, time) => ({

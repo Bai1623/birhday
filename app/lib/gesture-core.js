@@ -3,6 +3,7 @@ export const GESTURE_LABELS = {
   open: "张开手掌",
   fist: "握拳",
   pinch: "捏合",
+  point: "食指点选",
 };
 
 const FINGER_TIPS = [8, 12, 16, 20];
@@ -77,14 +78,21 @@ export const classifyHand = (landmarks, previousGesture = "none") => {
   const openness = extensionScores.reduce((sum, score) => sum + score, 0) / extensionScores.length;
 
   const pinchEnter = previousGesture === "pinch" ? 0.5 : 0.42;
+  const strongPinchEnter = previousGesture === "pinch" ? 0.24 : 0.18;
+  const pointEnter = previousGesture === "point" ? 1.22 : 1.32;
   const fistExit = previousGesture === "fist" ? 1.25 : 1.18;
   const openExit = previousGesture === "open" ? 1.25 : 1.34;
+  const [indexScore, middleScore, ringScore, pinkyScore] = extensionScores;
+  const pointFoldedCount = [middleScore, ringScore, pinkyScore].filter((score) => score < 1.2).length;
 
+  if (pinchRatio < strongPinchEnter || (pinchRatio < pinchEnter && foldedCount < 4)) {
+    return { gesture: "pinch", center, pinchRatio, openness };
+  }
+  if (indexScore > pointEnter && pointFoldedCount >= 2 && openness < openExit) {
+    return { gesture: "point", center, pinchRatio, openness };
+  }
   if (foldedCount >= 4 && openness < fistExit) {
     return { gesture: "fist", center, pinchRatio, openness };
-  }
-  if (pinchRatio < pinchEnter) {
-    return { gesture: "pinch", center, pinchRatio, openness };
   }
   if (extendedCount >= 4 && openness > openExit) {
     return { gesture: "open", center, pinchRatio, openness };

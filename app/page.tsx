@@ -471,7 +471,7 @@ export default function Home() {
       }
       return;
     }
-    if (gesture === "pinch" && stageRef.current === "gallery") {
+    if ((gesture === "pinch" || gesture === "point") && stageRef.current === "gallery") {
       if (selectedCardRef.current !== null) {
         setSelectedCard(null);
       } else {
@@ -786,7 +786,7 @@ export default function Home() {
             <button className="primary-button compact" onClick={toggleGallery}>
               <span>{stage === "cake" ? "展开回忆星球" : "收拢生日蛋糕"}</span><i>{stage === "cake" ? "✦" : "⌁"}</i>
             </button>
-            <p>{stage === "cake" ? "点击按钮或张开手掌" : "拖动旋转 · 点击照片 · 捏合可放大"}</p>
+            <p>{stage === "cake" ? "点击按钮或张开手掌" : "拖动旋转 · 点击照片 · 食指点选/捏合可放大"}</p>
           </div>
         </>
       )}
